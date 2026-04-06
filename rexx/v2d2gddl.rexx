@@ -1,0 +1,172 @@
+/* REXX - V2D2GDDL - DDL GENERATOR                            */
+/* Lee V2D2_FIELDS de DB2 y genera CREATE TABLE DDL            */
+/* Maneja REDEFINES con tabla ancha (columnas nullable)        */
+/*                                                              */
+/* Parametros: JOB_ID [FILE_NAME]                              */
+/*============================================================*/
+PARSE ARG P_JOBID P_FILE
+IF P_JOBID = '' THEN DO
+  SAY 'USO: V2D2GDDL job_id [file_name]'
+  EXIT 8
+END
+
+S_RC = RXSUBCOM('ADD','DSNREXX','DSNREXX')
+ADDRESS DSNREXX "CONNECT DSN1"
+IF RC <> 0 THEN DO
+  SAY '*** DB2 CONNECT FAILED'
+  EXIT 8
+END
+
+/* Get files for this job */
+IF P_FILE = '' THEN DO
+  S1 = "SELECT FILE_NAME, FILE_ORG, KEY_FIELD",
+    "FROM IBMUSER.V2D2_FILES",
+    "WHERE JOB_ID = "P_JOBID,
+    "ORDER BY FILE_NAME"
+END
+ELSE DO
+  S1 = "SELECT FILE_NAME, FILE_ORG, KEY_FIELD",
+    "FROM IBMUSER.V2D2_FILES",
+    "WHERE JOB_ID = "P_JOBID,
+    "AND FILE_NAME = '"LEFT(P_FILE,30)"'"
+END
+
+ADDRESS DSNREXX "EXECSQL DECLARE CF CURSOR FOR S1"
+ADDRESS DSNREXX "EXECSQL PREPARE S1 FROM :S1"
+ADDRESS DSNREXX "EXECSQL OPEN CF"
+
+DDL_NUM = 0
+DO FOREVER
+  ADDRESS DSNREXX,
+    "EXECSQL FETCH CF INTO :V_FNAME,:V_FORG,:V_FKEY"
+  IF SQLCODE <> 0 THEN LEAVE
+  FNAME = STRIP(V_FNAME)
+  FORG = STRIP(V_FORG)
+  FKEY = STRIP(V_FKEY)
+
+  /* Generate table name */
+  TBLNAME = 'IBMUSER.' || TRANSLATE(FNAME,' ','-')
+  TBLNAME = TRANSLATE(TBLNAME,'_',' ')
+
+  SAY '=== DDL PARA ARCHIVO:' FNAME '==='
+  SAY ''
+
+  /* Get fields for this file */
+  S2 = "SELECT FIELD_NAME, LEVEL_NUM, PIC_CLAUSE,",
+    "USAGE_TYPE, DB2_TYPE, DB2_COLNAME,",
+    "REDEF_OF, REDEF_GROUP",
+    "FROM IBMUSER.V2D2_FIELDS",
+    "WHERE JOB_ID = "P_JOBID,
+    "AND FILE_NAME = '"LEFT(FNAME,30)"'",
+    "AND LEVEL_NUM > 1",
+    "ORDER BY OFFSET_POS, FIELD_NAME"
+  ADDRESS DSNREXX "EXECSQL DECLARE C2 CURSOR FOR S2"
+  ADDRESS DSNREXX "EXECSQL PREPARE S2 FROM :S2"
+  ADDRESS DSNREXX "EXECSQL OPEN C2"
+
+  /* Build DDL */
+  DDL. = ''
+  DDL_NUM = DDL_NUM + 1
+  DDL.1 = 'CREATE TABLE' TBLNAME '('
+  DCNT = 1
+  HAS_REDEF = 0
+  PREV_REDEF = ''
+
+  DO FOREVER
+    ADDRESS DSNREXX,
+      "EXECSQL FETCH C2 INTO :F_NAME,:F_LVL,:F_PIC,",
+      ":F_USAGE,:F_DB2,:F_COL,:F_RDEF,:F_RGRP"
+    IF SQLCODE <> 0 THEN LEAVE
+
+    COLNAME = STRIP(F_COL)
+    DB2TYPE = STRIP(F_DB2)
+    REDEF = STRIP(F_RDEF)
+    RGRP = STRIP(F_RGRP)
+    LVL = F_LVL + 0
+
+    /* Skip group levels without PIC */
+    IF DB2TYPE = '' | DB2TYPE = 'CHAR(1)' THEN DO
+      IF STRIP(F_PIC) = '' THEN ITERATE
+    END
+
+    DCNT = DCNT + 1
+
+    /* Add REDEFINES comment */
+    IF REDEF <> '' & REDEF <> PREV_REDEF THEN DO
+      HAS_REDEF = 1
+      DCNT = DCNT + 1
+      DDL.DCNT = '  -- REDEFINE' RGRP '(' || REDEF || ')'
+      DCNT = DCNT + 1
+    END
+    PREV_REDEF = REDEF
+
+    /* Nullable for REDEFINES columns */
+    NULLABLE = ''
+    IF COLNAME = FKEY THEN
+      NULLABLE = 'NOT NULL'
+
+    DDL.DCNT = '  ' || LEFT(COLNAME,20) || DB2TYPE || ,
+      ' ' || NULLABLE || ','
+  END
+  ADDRESS DSNREXX "EXECSQL CLOSE C2"
+
+  /* Add primary key if KSDS */
+  IF FORG = 'KSDS' & FKEY <> '' THEN DO
+    PKCOL = TRANSLATE(FKEY,' ','-')
+    PKCOL = TRANSLATE(PKCOL,'_',' ')
+    DCNT = DCNT + 1
+    DDL.DCNT = '  PRIMARY KEY (' || PKCOL || ')'
+  END
+  ELSE DO
+    /* Remove trailing comma from last column */
+    LAST = DDL.DCNT
+    IF RIGHT(STRIP(LAST),1) = ',' THEN
+      DDL.DCNT = LEFT(STRIP(LAST),LENGTH(STRIP(LAST))-1)
+  END
+
+  DCNT = DCNT + 1
+  DDL.DCNT = ') IN V2D2DB.V2D2TS;'
+  DDL.0 = DCNT
+
+  /* Output DDL */
+  DO D = 1 TO DDL.0
+    SAY DDL.D
+  END
+  SAY ''
+
+  /* Store DDL in V2D2_LOG for display */
+  DO D = 1 TO DDL.0
+    DLINE = DDL.D
+    DLINE = TRANSLATE(DLINE,"''","'")
+    S3 = "INSERT INTO IBMUSER.V2D2_LOG",
+      "(JOB_ID, SEQ_NUM, MSG_TYPE, MESSAGE)",
+      "VALUES("P_JOBID","D",'D',",
+      "'"LEFT(DLINE,80)"')"
+    ADDRESS DSNREXX "EXECSQL EXECUTE IMMEDIATE :S3"
+  END
+
+  /* Generate CREATE INDEX for key */
+  IF FORG = 'KSDS' & FKEY <> '' THEN DO
+    PKCOL = TRANSLATE(FKEY,' ','-')
+    PKCOL = TRANSLATE(PKCOL,'_',' ')
+    IXNAME = 'IBMUSER.' || LEFT(FNAME,6) || 'IX'
+    SAY 'CREATE UNIQUE INDEX' IXNAME
+    SAY '  ON' TBLNAME '(' || PKCOL || ')'
+    SAY '  USING STOGROUP SYSDEFLT;'
+    SAY ''
+  END
+
+  /* Update file table with generated table name */
+  S4 = "UPDATE IBMUSER.V2D2_FILES",
+    "SET TABLE_NAME = '"LEFT(TBLNAME,44)"'",
+    "WHERE JOB_ID = "P_JOBID,
+    "AND FILE_NAME = '"LEFT(FNAME,30)"'"
+  ADDRESS DSNREXX "EXECSQL EXECUTE IMMEDIATE :S4"
+
+END /* file loop */
+ADDRESS DSNREXX "EXECSQL CLOSE CF"
+ADDRESS DSNREXX "EXECSQL COMMIT"
+
+SAY '=== DDL GENERATION COMPLETE ==='
+ADDRESS DSNREXX "DISCONNECT"
+EXIT 0

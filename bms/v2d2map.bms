@@ -1,0 +1,57 @@
+V2D2MAP  DFHMSD TYPE=&SYSPARM,MODE=INOUT,LANG=COBOL,STORAGE=AUTO,      X
+               CTRL=FREEKB,TIOAPFX=YES
+V2D2M01  DFHMDI SIZE=(24,80),LINE=1,COLUMN=1
+         DFHMDF POS=(1,2),LENGTH=40,ATTRB=(ASKIP,BRT),                 X
+               INITIAL='V2D2 - CONVERSION VSAM A DB2'
+M01DATE  DFHMDF POS=(1,62),LENGTH=10,ATTRB=(ASKIP,NORM)
+         DFHMDF POS=(2,2),LENGTH=50,ATTRB=(ASKIP,NORM),                X
+               INITIAL='=================================='
+         DFHMDF POS=(4,4),LENGTH=30,ATTRB=(ASKIP,NORM),                X
+               INITIAL='1. Analizar programa COBOL'
+         DFHMDF POS=(5,4),LENGTH=25,ATTRB=(ASKIP,NORM),                X
+               INITIAL='2. Generar DDL de DB2'
+         DFHMDF POS=(6,4),LENGTH=30,ATTRB=(ASKIP,NORM),                X
+               INITIAL='3. Convertir programa'
+         DFHMDF POS=(7,4),LENGTH=30,ATTRB=(ASKIP,NORM),                X
+               INITIAL='4. Compilar convertido'
+         DFHMDF POS=(8,4),LENGTH=30,ATTRB=(ASKIP,NORM),                X
+               INITIAL='5. Migrar datos VSAM a DB2'
+         DFHMDF POS=(9,4),LENGTH=25,ATTRB=(ASKIP,NORM),                X
+               INITIAL='6. Ver estado'
+         DFHMDF POS=(11,4),LENGTH=10,ATTRB=(ASKIP,NORM),               X
+               INITIAL='X. Salir'
+         DFHMDF POS=(13,4),LENGTH=12,ATTRB=(ASKIP,NORM),               X
+               INITIAL='Opcion ==>'
+M01OPT   DFHMDF POS=(13,17),LENGTH=1,ATTRB=(UNPROT,IC,FSET)
+         DFHMDF POS=(13,19),LENGTH=1,ATTRB=ASKIP
+         DFHMDF POS=(15,4),LENGTH=8,ATTRB=(ASKIP,NORM),                X
+               INITIAL='Mensaje:'
+M01MSG   DFHMDF POS=(15,14),LENGTH=60,ATTRB=(ASKIP,BRT)
+         DFHMDF POS=(23,2),LENGTH=20,ATTRB=(ASKIP,NORM),               X
+               INITIAL='PF3=Salir'
+V2D2M02  DFHMDI SIZE=(24,80),LINE=1,COLUMN=1
+         DFHMDF POS=(1,2),LENGTH=35,ATTRB=(ASKIP,BRT),                 X
+               INITIAL='V2D2 - ANALISIS DE PROGRAMA'
+         DFHMDF POS=(2,2),LENGTH=50,ATTRB=(ASKIP,NORM),                X
+               INITIAL='=================================='
+         DFHMDF POS=(4,4),LENGTH=15,ATTRB=(ASKIP,NORM),                X
+               INITIAL='Dataset fuente:'
+M02DSN   DFHMDF POS=(4,20),LENGTH=44,ATTRB=(UNPROT,IC,FSET)
+         DFHMDF POS=(4,65),LENGTH=1,ATTRB=ASKIP
+         DFHMDF POS=(5,4),LENGTH=15,ATTRB=(ASKIP,NORM),                X
+               INITIAL='Member........:'
+M02MBR   DFHMDF POS=(5,20),LENGTH=8,ATTRB=(UNPROT,FSET)
+         DFHMDF POS=(5,29),LENGTH=1,ATTRB=ASKIP
+M02RC    DFHMDF POS=(7,4),LENGTH=60,ATTRB=(ASKIP,BRT)
+M02CNT   DFHMDF POS=(8,4),LENGTH=40,ATTRB=(ASKIP,NORM)
+M02F1    DFHMDF POS=(10,4),LENGTH=70,ATTRB=(ASKIP,NORM)
+M02F2    DFHMDF POS=(11,4),LENGTH=70,ATTRB=(ASKIP,NORM)
+M02F3    DFHMDF POS=(12,4),LENGTH=70,ATTRB=(ASKIP,NORM)
+M02F4    DFHMDF POS=(13,4),LENGTH=70,ATTRB=(ASKIP,NORM)
+M02F5    DFHMDF POS=(14,4),LENGTH=70,ATTRB=(ASKIP,NORM)
+M02OPS   DFHMDF POS=(16,4),LENGTH=70,ATTRB=(ASKIP,NORM)
+M02MSG   DFHMDF POS=(20,4),LENGTH=70,ATTRB=(ASKIP,BRT)
+         DFHMDF POS=(23,2),LENGTH=30,ATTRB=(ASKIP,NORM),               X
+               INITIAL='PF3=Menu  PF5=Generar DDL'
+         DFHMSD TYPE=FINAL
+         END
