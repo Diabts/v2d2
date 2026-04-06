@@ -25,7 +25,8 @@ Dado un programa COBOL que lee/escribe archivos VSAM, V2D2:
 rexx/
   v2d2scan.rexx   - Parser de COBOL (detecta VSAM, FDs, REDEFINES, I/O)
   v2d2gddl.rexx   - Generador de DDL (PIC -> DB2 types)
-  v2d2xfrm.rexx   - Conversor de programa (VSAM ops -> SQL)
+  v2d2dclg.rexx   - Generador de DCLGEN (copybooks con DECLARE TABLE + host vars)
+  v2d2xfrm.rexx   - Conversor de programa (VSAM ops -> SQL, usa DCLGEN INCLUDEs)
 
 cobol/
   v2d2main.cbl    - Menu principal CICS
@@ -66,9 +67,20 @@ test/
 | `EXEC CICS READNEXT FILE(f) INTO(r)` | `EXEC SQL FETCH cursor INTO :r END-EXEC` |
 | `EXEC CICS ENDBR FILE(f)` | `EXEC SQL CLOSE cursor END-EXEC` |
 
+## DCLGEN
+
+V2D2 genera **DCLGEN copybooks** estandar IBM para cada tabla DB2 generada. Cada copybook contiene:
+
+1. `EXEC SQL DECLARE tabla TABLE (...)` - declaracion de la estructura de la tabla
+2. Host variables COBOL que matchean exactamente las columnas DB2
+
+Los DCLGEN se guardan en `IBMUSER.V2D2.DCLGEN` y el programa convertido los incluye con `EXEC SQL INCLUDE member END-EXEC.` en WORKING-STORAGE.
+
+Pipeline: `V2D2SCAN` -> `V2D2GDDL` -> **`V2D2DCLG`** -> `V2D2XFRM`
+
 ## Manejo de REDEFINES
 
-V2D2 detecta REDEFINES en el FD y genera una **tabla ancha** con todas las columnas de todas las variantes. Los campos REDEFINES se omiten de las host variables y el SQL generado usa solo los campos primarios.
+V2D2 detecta REDEFINES en el FD y genera una **tabla ancha** con todas las columnas de todas las variantes. Los campos REDEFINES se omiten de las host variables/DCLGEN y el SQL generado usa solo los campos primarios.
 
 ## Requisitos
 
@@ -85,4 +97,5 @@ V2D2 detecta REDEFINES en el FD y genera una **tabla ancha** con todas las colum
 - `IBMUSER.V2D2.BMS` - BMS mapset source
 - `IBMUSER.V2D2.LOAD` - Load modules
 - `IBMUSER.V2D2.DBRM` - DBRMs
+- `IBMUSER.V2D2.DCLGEN` - DCLGEN copybooks generados
 - `IBMUSER.V2D2.JCL` - JCL procedures
